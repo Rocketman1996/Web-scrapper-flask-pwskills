@@ -4,11 +4,14 @@ import requests
 from bs4 import BeautifulSoup as bs
 from urllib.request import urlopen as uReq
 import logging
+import pymongo
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 logging.basicConfig(filename="scrapper.log" , level=logging.INFO)
 
 app = Flask(__name__)
 
-@app.route("/", methods = ['GET'])
+@app.route("/1", methods = ['GET'])
 def homepage():
     return render_template("index.html")
 
@@ -20,14 +23,14 @@ def index():
             flipkart_url = "https://www.flipkart.com/search?q=" + searchString
             uClient = uReq(flipkart_url)
             flipkartPage = uClient.read()
-            uClient.close()
+            uClient.close() # after fetching all the data in flipkartPage we are closing the connection for good practice
             flipkart_html = bs(flipkartPage, "html.parser")
             bigboxes = flipkart_html.findAll("div", {"class": "_1AtVbE col-12-12"})
             del bigboxes[0:3]
             box = bigboxes[0]
             productLink = "https://www.flipkart.com" + box.div.div.div.a['href']
             prodRes = requests.get(productLink)
-            prodRes.encoding='utf-8'
+            prodRes.encoding='utf-8'#Hey computer, the text we're getting from the website is written in a way called 'UTF-8,' so make sure you understand it correctly.
             prod_html = bs(prodRes.text, "html.parser")
             print(prod_html)
             commentboxes = prod_html.find_all('div', {'class': "_16PBlm"})
@@ -72,6 +75,12 @@ def index():
                           "Comment": custComment}
                 reviews.append(mydict)
             logging.info("log my final result {}".format(reviews))
+            uri = "mongodb+srv://rocketman:6thXLfUfp9VYcYR@cluster0.wrdju6l.mongodb.net/?retryWrites=true&w=majority"
+             # Create a new client and connect to the server
+            client = MongoClient(uri, server_api=ServerApi('1'))
+            db = client['Review_data']
+            data_feeder = db['review_scrape_data']
+            data_feeder.insert_many(reviews)
             return render_template('result.html', reviews=reviews[0:(len(reviews)-1)])
         except Exception as e:
             logging.info(e)
